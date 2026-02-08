@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>AR拍照亭 - GitHub Pages版</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- 使用CDN链接，确保稳定 -->
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://unpkg.com/ar.js@3.4.0/aframe/build/aframe-ar.js"></script>
+  
+  <style>
+    /* 极简风格，确保兼容性 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #000;
+      color: white;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    
+    /* 启动屏幕 */
+    #splash {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .logo {
+      font-size: 100px;
+      margin-bottom: 30px;
+      animation: bounce 2s infinite;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+    
+    h1 {
+      font-size: 48px;
+      font-weight: 900;
+      margin-bottom: 20px;
+      text-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    
+    .subtitle {
+      font-size: 20px;
+      opacity: 0.9;
+      margin-bottom: 40px;
+      max-width: 500px;
+    }
+    
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin: 30px 0;
+      max-width: 600px;
+    }
+    
+    .feature {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 15px 25px;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    #startBtn {
+      background: linear-gradient(45deg, #FF416C, #FF4B2B);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      padding: 25px 70px;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 40px;
+      box-shadow: 0 15px 35px rgba(255,65,108,0.4);
+      transition: all 0.3s;
+    }
+    
+    #startBtn:active {
+      transform: scale(0.95);
+    }
+    
+    .github-badge {
+      position: absolute;
+      bottom: 30px;
+      background: rgba(255,255,255,0.1);
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    /* AR场景 */
+    #arContainer {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    
+    /* 控制栏 */
+    .controls {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 90%;
+    }
+    
+    .btn {
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 15px;
+      padding: 15px 25px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 140px;
+      justify-content: center;
+    }
+    
+    .btn:active {
+      background: rgba(255,255,255,0.2);
+    }
+    
+    .photo-btn {
+      background: linear-gradient(45deg, #FF416C, #FF4B2B);
+      font-weight: bold;
+    }
+    
+    /* 场景指示器 */
+    .scene-indicator {
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(20px);
+      border-radius: 25px;
+      padding: 15px 30px;
+      color: white;
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      z-index: 100;
+    }
+    
+    /* 拍照预览 */
+    #preview {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.95);
+      z-index: 1000;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    #previewImg {
+      max-width: 90%;
+      max-height: 70%;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      margin-bottom: 40px;
+    }
+    
+    .preview-btns {
+      display: flex;
+      gap: 20px;
+    }
+    
+    .preview-btn {
+      padding: 15px 40px;
+      border-radius: 15px;
+      border: none;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      color: white;
+    }
+    
+    #saveBtn {
+      background: linear-gradient(45deg, #4CAF50, #2E7D32);
+    }
+    
+    #closePreview {
+      background: linear-gradient(45deg, #f44336, #c62828);
+    }
+    
+    /* 加载动画 */
+    .loader {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 2000;
+      text-align: center;
+      color: white;
+    }
+    
+    .spinner {
+      width: 80px;
+      height: 80px;
+      border: 6px solid rgba(255,255,255,0.3);
+      border-top-color: #FF416C;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* 错误提示 */
+    #error {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(244, 67, 54, 0.9);
+      color: white;
+      padding: 30px;
+      border-radius: 20px;
+      text-align: center;
+      z-index: 3000;
+      max-width: 400px;
+      backdrop-filter: blur(20px);
+    }
+    
+    /* 教程提示 */
+    .tutorial {
+      position: absolute;
+      top: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 15px;
+      font-size: 16px;
+      text-align: center;
+      z-index: 90;
+      backdrop-filter: blur(10px);
+      max-width: 90%;
+    }
+    
+    /* 响应式 */
+    @media (max-width: 768px) {
+      h1 { font-size: 36px; }
+      .subtitle { font-size: 16px; }
+      .feature { font-size: 16px; padding: 12px 20px; }
+      #startBtn { padding: 20px 50px; font-size: 24px; }
+      .btn { min-width: 120px; padding: 12px 20px; font-size: 14px; }
+      .scene-indicator { font-size: 16px; padding: 12px 25px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- 启动屏幕 -->
+  <div id="splash">
+    <div class="logo">🎬</div>
+    <h1>AR 拍照亭</h1>
+    <p class="subtitle">无需安装，无需配置，打开即用</p>
+    
+    <div class="features">
+      <div class="feature">📱 手机电脑都能用</div>
+      <div class="feature">🚫 不需要 ngrok</div>
+      <div class="feature">📸 一键拍照保存</div>
+      <div class="feature">🎯 识别稳定快速</div>
+      <div class="feature">🌐 GitHub Pages 托管</div>
+      <div class="feature">💯 永久在线</div>
+    </div>
+    
+    <button id="startBtn" onclick="startAR()">
+      🚀 立即体验
+    </button>
+    
+    <div class="github-badge">
+      <span>⭐</span>
+      <span>GitHub Pages 永久托管 | 100% 免费</span>
+    </div>
+  </div>
+  
+  <!-- 加载动画 -->
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <p id="loaderText">准备 AR 环境...</p>
+  </div>
+  
+  <!-- AR场景 -->
+  <div id="arContainer">
+    <!-- 教程提示 -->
+    <div class="tutorial" id="tutorial">
+      将摄像头对准 Hiro 标记图案<br>
+      <small>提示：访问 <a href="https://hiro.ar-js.org" style="color:#FF416C; text-decoration:none;">hiro.ar-js.org</a> 打印标记</small>
+    </div>
+    
+    <!-- 场景指示器 -->
+    <div class="scene-indicator">
+      <span id="sceneIcon">🐶</span>
+      <span id="sceneName">动物合影</span>
+    </div>
+    
+    <!-- 控制栏 -->
+    <div class="controls">
+      <button class="btn" onclick="switchScene()">
+        <span>🔄</span>切换场景
+      </button>
+      <button class="btn" onclick="changeModel(-1)">
+        <span>⬅️</span>上一个
+      </button>
+      <button class="btn" onclick="changeModel(1)">
+        <span>➡️</span>下一个
+      </button>
+      <button class="btn photo-btn" onclick="takePhoto()">
+        <span>📸</span>拍照
+      </button>
+    </div>
+    
+    <!-- A-Frame AR场景 -->
+    <a-scene
+      vr-mode-ui="enabled: false"
+      embedded
+      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+      renderer="antialias: true; alpha: true;"
+    >
+      <!-- 光照 -->
+      <a-light type="ambient" color="#FFFFFF" intensity="0.8"></a-light>
+      <a-light type="directional" color="#FFFFFF" position="1 3 2" intensity="0.6"></a-light>
+      
+      <!-- 标记识别 -->
+      <a-marker preset="hiro">
+        <!-- 场景1：基础形状 -->
+        <a-entity id="scene1">
+          <!-- 红色立方体 -->
+          <a-box id="cube" 
+                color="#FF3B30" 
+                width="0.2" 
+                height="0.2" 
+                depth="0.2" 
+                position="-0.3 0.5 0"
+                visible="true">
+            <a-animation attribute="rotation"
+                        dur="10000"
+                        to="0 360 0"
+                        repeat="indefinite"
+                        easing="linear">
+            </a-animation>
+          </a-box>
+          
+          <!-- 蓝色球体 -->
+          <a-sphere id="sphere" 
+                   color="#007AFF" 
+                   radius="0.1" 
+                   position="0 0.5 0"
+                   visible="false">
+            <a-animation attribute="position"
+                        dur="2000"
+                        from="0 0.5 0"
+                        to="0 0.8 0"
+                        direction="alternate"
+                        repeat="indefinite"
+                        easing="easeInOutSine">
+            </a-animation>
+          </a-sphere>
+          
+          <!-- 绿色圆柱 -->
+          <a-cylinder id="cylinder" 
+                     color="#34C759" 
+                     radius="0.1" 
+                     height="0.3" 
+                     position="0.3 0.5 0"
+                     visible="false">
+            <a-animation attribute="rotation"
+                        dur="5000"
+                        to="360 0 0"
+                        repeat="indefinite"
+                        easing="linear">
+            </a-animation>
+          </a-cylinder>
+        </a-entity>
+        
+        <!-- 场景2：简单场景 -->
+        <a-entity id="scene2" visible="false">
+          <!-- 地面 -->
+          <a-plane color="#5AC8FA" 
+                  width="2" 
+                  height="2" 
+                  rotation="-90 0 0" 
+                  position="0 0 0">
+          </a-plane>
+          
+          <!-- 简单建筑 -->
+          <a-box color="#FF9500" 
+                width="0.3" 
+                height="0.5" 
+                depth="0.3" 
+                position="-0.5 0.25 0">
+          </a-box>
+          
+          <a-box color="#5856D6" 
+                width="0.4" 
+                height="0.3" 
+                depth="0.4" 
+                position="0.5 0.15 0">
+          </a-box>
+          
+          <!-- 人物 -->
+          <a-entity position="0 0.2 0.5">
+            <a-sphere color="#FF2D55" radius="0.05" position="0 0.15 0"></a-sphere>
+            <a-box color="#FF2D55" width="0.08" height="0.2" depth="0.08" position="0 -0.05 0"></a-box>
+          </a-entity>
+        </a-entity>
+      </a-marker>
+      
+      <a-entity camera></a-entity>
+    </a-scene>
+  </div>
+  
+  <!-- 拍照预览 -->
+  <div id="preview">
+    <img id="previewImg" src="">
+    <div class="preview-btns">
+      <button class="preview-btn" id="saveBtn" onclick="savePhoto()">💾 保存图片</button>
+      <button class="preview-btn" id="closePreview" onclick="closePreview()">✖️ 关闭</button>
+    </div>
+  </div>
+  
+  <!-- 错误提示 -->
+  <div id="error">
+    <h3 style="margin-bottom: 15px;">⚠️ 提示</h3>
+    <p id="errorText"></p>
+    <button onclick="location.reload()" 
+            style="margin-top: 20px; padding: 12px 30px; background: white; color: #f44336; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;">
+      刷新页面
+    </button>
+  </div>
+  
+  <script>
+    // ============== 全局变量 ==============
+    let currentScene = 1; // 1或2
+    let currentModel = 0; // 0,1,2
+    let models = ['cube', 'sphere', 'cylinder'];
+    let isARReady = false;
+    
+    // ============== 页面初始化 ==============
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('页面加载完成');
+      
+      // 检查URL，如果是GitHub Pages，显示提示
+      if (window.location.hostname.includes('github.io')) {
+        console.log('GitHub Pages 环境');
+        document.querySelector('.github-badge').innerHTML = 
+          '<span>🌐</span><span>GitHub Pages 托管 | 在线版</span>';
+      }
+      
+      // 检查设备
+      checkDevice();
+    });
+    
+    function checkDevice() {
+      const ua = navigator.userAgent;
+      
+      // 检查是否是iOS
+      if (/iPhone|iPad|iPod/.test(ua)) {
+        console.log('iOS设备');
+        // iOS Safari需要特殊处理
+        document.getElementById('tutorial').innerHTML = 
+          'iOS使用提示：<br>1. 点击下方"分享"按钮<br>2. 选择"添加到主屏幕"<br>3. 从主屏幕打开体验更佳';
+      }
+      
+      // 检查是否是Safari
+      if (/Safari/.test(ua) && !/Chrome/.test(ua)) {
+        console.log('Safari浏览器');
+      }
+    }
+    
+    // ============== 开始AR体验 ==============
+    function startAR() {
+      console.log('开始AR体验');
+      
+      // 隐藏启动页
+      document.getElementById('splash').style.display = 'none';
+      showLoader('正在检查摄像头权限...');
+      
+      // 检查浏览器支持
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showError('您的浏览器不支持摄像头功能<br>请使用最新版 Chrome 或 Safari');
+        return;
+      }
+      
+      // 请求摄像头权限
+      navigator.mediaDevices.getUserMedia({ 
+        video: {
+          facingMode: 'environment', // 优先使用后置摄像头
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      })
+      .then(stream => {
+        console.log('摄像头权限已获得');
+        // 停止流，A-Frame会重新获取
+        stream.getTracks().forEach(track => track.stop());
+        
+        // 初始化AR场景
+        initAR();
+      })
+      .catch(error => {
+        console.error('摄像头错误:', error);
+        hideLoader();
+        
+        let errorMsg = '无法访问摄像头';
+        if (error.name === 'NotAllowedError') {
+          errorMsg = '摄像头权限被拒绝<br>请允许浏览器访问摄像头';
+        } else if (error.name === 'NotFoundError') {
+          errorMsg = '未找到摄像头设备';
+        } else if (error.name === 'NotSupportedError') {
+          errorMsg = '当前环境不支持摄像头';
+        }
+        
+        showError(errorMsg);
+      });
+    }
+    
+    // ============== 初始化AR ==============
+    function initAR() {
+      showLoader('正在加载AR场景...');
+      
+      // 显示AR容器
+      document.getElementById('arContainer').style.display = 'block';
+      
+      // 获取A-Frame场景
+      const scene = document.querySelector('a-scene');
+      
+      if (scene) {
+        // 监听场景加载完成
+        scene.addEventListener('loaded', function() {
+          console.log('AR场景加载完成');
+          hideLoader();
+          isARReady = true;
+          
+          // 几秒后隐藏教程
+          setTimeout(() => {
+            document.getElementById('tutorial').style.opacity = '0.5';
+          }, 5000);
+        });
+        
+        // 错误处理
+        scene.addEventListener('error', function(e) {
+          console.error('AR场景错误:', e.detail);
+          hideLoader();
+          showError('AR场景加载失败<br>请确保浏览器支持WebGL');
+        });
+        
+        // AR.js事件
+        scene.addEventListener('arjs-video-loaded', function() {
+          console.log('AR视频流已加载');
+        });
+        
+        scene.addEventListener('markerFound', function() {
+          console.log('标记识别成功');
+          document.getElementById('tutorial').style.display = 'none';
+        });
+        
+        scene.addEventListener('markerLost', function() {
+          console.log('标记丢失');
+          document.getElementById('tutorial').style.display = 'block';
+        });
+        
+        // 更新场景指示器
+        updateSceneIndicator();
+      } else {
+        hideLoader();
+        showError('无法创建AR场景');
+      }
+    }
+    
+    // ============== 场景控制 ==============
+    function switchScene() {
+      const scene1 = document.getElementById('scene1');
+      const scene2 = document.getElementById('scene2');
+      
+      if (currentScene === 1) {
+        // 切换到场景2
+        scene1.setAttribute('visible', 'false');
+        scene2.setAttribute('visible', 'true');
+        currentScene = 2;
+      } else {
+        // 切换到场景1
+        scene2.setAttribute('visible', 'false');
+        scene1.setAttribute('visible', 'true');
+        currentScene = 1;
+        currentModel = 0;
+        showCurrentModel();
+      }
+      
+      updateSceneIndicator();
+    }
+    
+    function updateSceneIndicator() {
+      const icon = document.getElementById('sceneIcon');
+      const name = document.getElementById('sceneName');
+      
+      if (currentScene === 1) {
+        icon.textContent = '🎮';
+        name.textContent = '基础形状';
+      } else {
+        icon.textContent = '🏙️';
+        name.textContent = '简单场景';
+      }
+    }
+    
+    // ============== 模型控制 ==============
+    function showCurrentModel() {
+      if (currentScene !== 1) return;
+      
+      models.forEach((modelId, index) => {
+        const model = document.getElementById(modelId);
+        if (model) {
+          model.setAttribute('visible', index === currentModel);
+        }
+      });
+    }
+    
+    function changeModel(direction) {
+      if (currentScene !== 1) return;
+      
+      currentModel = (currentModel + direction + models.length) % models.length;
+      showCurrentModel();
+    }
+    
+    // ============== 拍照功能 ==============
+    function takePhoto() {
+      if (!isARReady) {
+        showError('AR场景未就绪<br>请等待加载完成');
+        return;
+      }
+      
+      console.log('拍照中...');
+      
+      try {
+        const scene = document.querySelector('a-scene');
+        const canvas = document.querySelector('canvas');
+        
+        if (canvas && canvas.width > 100) {
+          // 创建高质量截图
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = canvas.height;
+          const ctx = tempCanvas.getContext('2d');
+          
+          // 白色背景
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+          
+          // 绘制AR内容
+          ctx.drawImage(canvas, 0, 0);
+          
+          // 添加水印
+          ctx.fillStyle = 'rgba(0,0,0,0.3)';
+          ctx.font = '20px Arial';
+          ctx.fillText('AR Photo Booth', 20, tempCanvas.height - 20);
+          
+          // 显示预览
+          const dataURL = tempCanvas.toDataURL('image/png');
+          document.getElementById('previewImg').src = dataURL;
+          document.getElementById('preview').style.display = 'flex';
+        } else {
+          // 备用方案：提示用户截图
+          showError('无法获取画面<br>请使用系统截图功能：<br>1. 同时按电源+音量上键<br>2. 或按Cmd+Shift+4（Mac）');
+        }
+      } catch (error) {
+        console.error('拍照失败:', error);
+        showError('拍照功能暂时不可用');
+      }
+    }
+    
+    function savePhoto() {
+      const img = document.getElementById('previewImg');
+      if (!img.src) return;
+      
+      try {
+        const link = document.createElement('a');
+        link.href = img.src;
+        const date = new Date();
+        const filename = `AR_Photo_${date.getFullYear()}${pad(date.getMonth()+1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}.png`;
+        link.download = filename;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // 显示保存成功提示
+        setTimeout(() => {
+          alert('照片已开始下载！\n请在下载文件夹中查看。');
+        }, 300);
+      } catch (error) {
+        console.error('保存失败:', error);
+        alert('保存失败，请长按图片选择"保存图像"');
+      }
+    }
+    
+    function pad(num) {
+      return num.toString().padStart(2, '0');
+    }
+    
+    function closePreview() {
+      document.getElementById('preview').style.display = 'none';
+    }
+    
+    // ============== UI辅助函数 ==============
+    function showLoader(text) {
+      document.getElementById('loaderText').textContent = text;
+      document.getElementById('loader').style.display = 'block';
+    }
+    
+    function hideLoader() {
+      document.getElementById('loader').style.display = 'none';
+    }
+    
+    function showError(html) {
+      document.getElementById('errorText').innerHTML = html;
+      document.getElementById('error').style.display = 'block';
+    }
+    
+    // ============== Safari兼容处理 ==============
+    // 防止iOS橡皮筋效果
+    document.addEventListener('touchmove', function(e) {
+      if (document.getElementById('arContainer').style.display === 'block') {
+        e.preventDefault();
+      }
+    }, { passive: false });
+    
+    // 防止页面滚动
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+  </script>
+</body>
+</html>
